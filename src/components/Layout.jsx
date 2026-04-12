@@ -7,8 +7,11 @@ const NAV_ITEMS = [
     { to: '/clients', icon: '◻', label: 'クライアント一覧' },
     { to: '/review', icon: '◻', label: 'スタッフレビュー' },
   ]},
-  { label: '管理', items: [
-    { to: '/audit', icon: '◻', label: '監査ログ' },
+  { label: '管理', adminOnly: true, items: [
+    { to: '/kb', icon: '◻', label: '知識ベース', adminOnly: true },
+    { to: '/audit', icon: '◻', label: '監査ログ', adminOnly: true },
+  ]},
+  { label: '設定', items: [
     { to: '/settings', icon: '◻', label: '設定' },
   ]},
 ];
@@ -47,11 +50,28 @@ const ICONS = {
       <path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.1 3.1l1.4 1.4M11.5 11.5l1.4 1.4M3.1 12.9l1.4-1.4M11.5 4.5l1.4-1.4" />
     </svg>
   ),
+  '/kb': (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12.5A1.5 1.5 0 013.5 11H14" />
+      <path d="M3.5 1H14v14H3.5A1.5 1.5 0 012 13.5v-12A1.5 1.5 0 013.5 1z" />
+      <path d="M5 5h6M5 8h4" />
+    </svg>
+  ),
 };
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const isAdmin = user?.role === 'admin';
+
+  // Filter nav items based on role
+  const visibleNav = NAV_ITEMS
+    .filter(section => !section.adminOnly || isAdmin)
+    .map(section => ({
+      ...section,
+      items: section.items.filter(item => !item.adminOnly || isAdmin),
+    }))
+    .filter(section => section.items.length > 0);
 
   return (
     <div className="app-layout">
@@ -65,7 +85,7 @@ export default function Layout({ children }) {
         </div>
 
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map(section => (
+          {visibleNav.map(section => (
             <div key={section.label}>
               <div className="sidebar-section-label">{section.label}</div>
               {section.items.map(item => (

@@ -12,6 +12,8 @@ export default function ClientDetailPage() {
   const [sessions, setSessions] = useState([]);
   const [hypotheses, setHypotheses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingDate, setEditingDate] = useState(null);
+  const [newSessionDate, setNewSessionDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     loadData();
@@ -47,13 +49,23 @@ export default function ClientDetailPage() {
         session_number: sessionNumber,
         session_type: sessionNumber === 1 ? 'initial' : 'followup',
         status: 'in_progress',
-        date: new Date().toISOString().split('T')[0],
+        date: newSessionDate,
       });
       await db.updateClient(id, { session_count: sessionNumber, last_session_date: session.date });
       await db.createAuditLog({ user_id: user.id, user_name: user.name, action: 'session_create', target: session.id, target_label: `${client.name} - 第${sessionNumber}回セッション`, details: 'セッションを開始' });
       navigate(`/sessions/${session.id}/observation`);
     } catch (err) {
       alert('セッション作成に失敗: ' + err.message);
+    }
+  };
+
+  const handleDateChange = async (sessionId, newDate) => {
+    try {
+      await db.updateSession(sessionId, { date: newDate });
+      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, date: newDate } : s));
+      setEditingDate(null);
+    } catch (err) {
+      alert('日付の更新に失敗: ' + err.message);
     }
   };
 
@@ -74,10 +86,21 @@ export default function ClientDetailPage() {
           </h1>
           <p className="page-subtitle">{client.age}歳 {client.gender} ・ セッション {client.session_count || 0}回 ・ 登録日 {client.created_at?.split('T')[0]}</p>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-          <Link to={`/clients/${id}/intake`} className="btn btn-secondary">問診を見る</Link>
-          <Link to={`/clients/${id}/history`} className="btn btn-secondary">履歴</Link>
-          <button className="btn btn-primary" onClick={handleCreateSession}>＋ 新規セッション</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)', alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+            <Link to={`/clients/${id}/intake`} className="btn btn-secondary">問診を見る</Link>
+            <Link to={`/clients/${id}/history`} className="btn btn-secondary">履歴</Link>
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
+            <input
+              type="date"
+              className="form-input"
+              value={newSessionDate}
+              onChange={e => setNewSessionDate(e.target.value)}
+              style={{ width: 150, fontSize: 'var(--font-size-sm)', padding: '6px 10px' }}
+            />
+            <button className="btn btn-primary" onClick={handleCreateSession}>＋ 新規セッション</button>
+          </div>
         </div>
       </div>
 
@@ -154,7 +177,23 @@ export default function ClientDetailPage() {
               <tbody>
                 {sessions.map(s => (
                   <tr key={s.id}>
-                    <td>{s.date}</td><td>第{s.session_number}回</td>
+                    <td>
+                      {editingDate === s.id ? (
+                        <input
+                          type="date"
+                          className="form-input"
+                          defaultValue={s.date}
+                          autoFocus
+                          style={{ width: 140, fontSize: 'var(--font-size-xs)', padding: '3px 6px' }}
+                          onBlur={e => handleDateChange(s.id, e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { handleDateChange(s.id, e.target.value); } if (e.key === 'Escape') setEditingDate(null); }}
+                        />
+                      ) : (
+                        <span onClick={() => setEditingDate(s.id)} style={{ cursor: 'pointer', borderBottom: '1px dashed var(--color-border)' }} title="クリックで日付を編集">
+                          {s.date}
+                        </span>
+                      )}
+                    </td><td>第{s.session_number}回</td>
                     <td>{s.session_type === 'initial' ? '初回' : '継続'}</td>
                     <td><span className={`badge ${s.status === 'completed' ? 'badge-success' : 'badge-warning'}`}>{s.status === 'completed' ? '完了' : '進行中'}</span></td>
                     <td><Link to={`/sessions/${s.id}/observation`} className="btn btn-ghost btn-sm">開く →</Link></td>

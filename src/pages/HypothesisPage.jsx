@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import * as db from '../lib/database';
 import { useAuth } from '../App';
 import { promptB_HypothesisGeneration } from '../services/aiService';
@@ -7,9 +7,26 @@ import { promptB_HypothesisGeneration } from '../services/aiService';
 const CATEGORIES = ['構造・可動性仮説', '筋機能仮説', '運動制御仮説', '感覚入力仮説', '呼吸・圧仮説', '生活背景仮説'];
 const CAT_INDEX = (cat) => CATEGORIES.indexOf(cat) + 1;
 
+// 評価カテゴリ → 仮説カテゴリへのマッピング
+const EVAL_TO_HYPO_CATEGORY = {
+  structure_mobility: '構造・可動性仮説',
+  muscle_function: '筋機能仮説',
+  motor_control: '運動制御仮説',
+  sensory_input: '感覚入力仮説',
+  breathing_pressure: '呼吸・圧仮説',
+  lifestyle: '生活背景仮説',
+};
+
+const EVAL_TYPE_LABELS = {
+  primary_factor: '主要因候補',
+  modifying_factor: '修飾因子候補',
+  resulting_finding: '結果所見',
+};
+
 export default function HypothesisPage() {
   const { id: sessionId } = useParams();
   const { user } = useAuth();
+  const location = useLocation();
   const [session, setSession] = useState(null);
   const [client, setClient] = useState(null);
   const [hypotheses, setHypotheses] = useState([]);
@@ -18,8 +35,16 @@ export default function HypothesisPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
+  const [importedEvals, setImportedEvals] = useState(null);
 
   useEffect(() => { loadData(); }, [sessionId]);
+
+  // Check for incoming evaluations from OTE page
+  useEffect(() => {
+    if (location.state?.fromEvaluations) {
+      setImportedEvals(location.state.fromEvaluations);
+    }
+  }, [location.state]);
 
   async function loadData() {
     try {
@@ -32,17 +57,71 @@ export default function HypothesisPage() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   }
 
+  // Import evaluations as hypotheses
+  const handleImportEvaluations = async () => {
+    if (!importedEvals || importedEvals.length === 0) return;
+    try {
+      for (const ev of importedEvals) {
+        const category = EVAL_TO_HYPO_CATEGORY[ev.category] || '構造・可動性仮説';
+        const typeLabel = EVAL_TYPE_LABELS[ev.type] || '';
+        const linkedInfo = [
+          ...(ev.linkedObservations || []).map(n => `観察: ${n}`),
+          ...(ev.linkedTests || []).map(n => `テスト: ${n}`),
+        ].join('、');
+
+        const description = [
+          ev.title,
+          ev.interpretation ? `\n${ev.interpretation}` : '',
+          typeLabel ? `\n[${typeLabel}]` : '',
+        ].join('');
+
+        const rationale = linkedInfo || '';
+        const priority = ev.priority === 'high' ? 1 : ev.priority === 'low' ? 3 : 2;
+
+        const created = await db.createHypothesis({
+          session_id: sessionId,
+          category,
+          description,
+          rationale,
+          priority,
+          status: 'pending',
+          source: 'manual',
+          next_check: ev.nextCheck || '',
+        });
+        setHypotheses(prev => [...prev, created]);
+      }
+      await db.createAuditLog({
+        user_id: user.id, user_name: user.name,
+        action: 'eval_import', target: sessionId,
+        target_label: `${client?.name} - 評価→仮説`,
+        details: `${importedEvals.length}件の評価を仮説として取り込み`,
+      });
+      setImportedEvals(null);
+      alert(`${importedEvals.length}件の評価を仮説として取り込みました`);
+    } catch (err) {
+      alert('取り込みエラー: ' + err.message);
+    }
+  };
+
   const handleAIGenerate = async () => {
     setAiLoading(true);
     try {
       const obs = session?.observations || {};
       const intake = await db.getIntakeByClientId(client.id);
       const bgFactors = intake ? [intake.occupation, intake.sleep, intake.stress, intake.exercise_history].filter(Boolean) : [];
-      const result = await promptB_HypothesisGeneration(
-        [...(obs.static || []).map(o => o.text), ...(obs.dynamic || []).map(o => o.text)],
-        (obs.assessments || []).map(a => a.text),
-        bgFactors
-      );
+
+      // Use new OTE data structure if available
+      let obsTexts = [];
+      let assessTexts = [];
+      if (obs.observations && Array.isArray(obs.observations)) {
+        obsTexts = obs.observations.map(o => o.name);
+        assessTexts = (obs.evaluations || []).map(e => `${e.title}: ${e.interpretation || ''}`);
+      } else {
+        obsTexts = [...(obs.static || []).map(o => o.text), ...(obs.dynamic || []).map(o => o.text)];
+        assessTexts = (obs.assessments || []).map(a => a.text);
+      }
+
+      const result = await promptB_HypothesisGeneration(obsTexts, assessTexts, bgFactors);
       if (result.success && result.data.hypotheses) {
         for (const h of result.data.hypotheses) {
           const created = await db.createHypothesis({
@@ -87,7 +166,7 @@ export default function HypothesisPage() {
     <div>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <Link to={`/clients/${client?.id}`} className="btn btn-ghost btn-sm" style={{ marginBottom: 'var(--space-sm)' }}>← 戻る</Link>
+          <Link to={`/sessions/${sessionId}/observation`} className="btn btn-ghost btn-sm" style={{ marginBottom: 'var(--space-sm)' }}>← 観察・評価に戻る</Link>
           <h1 className="page-title">問題リスト・仮説</h1>
           <p className="page-subtitle">観察・評価から導出された仮説候補を確認し、採用 / 保留 / 除外を判断してください</p>
         </div>
@@ -98,6 +177,30 @@ export default function HypothesisPage() {
           <Link to={`/sessions/${sessionId}/intervention`} className="btn btn-primary">介入画面へ →</Link>
         </div>
       </div>
+
+      {/* Import evaluations banner */}
+      {importedEvals && importedEvals.length > 0 && (
+        <div className="card" style={{ marginBottom: 'var(--space-lg)', borderLeft: '3px solid var(--color-accent)', background: 'var(--color-accent-light)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>
+                観察・評価から{importedEvals.length}件の評価を受信
+              </div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                {importedEvals.map(e => e.title).join('、')}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+              <button className="btn btn-primary btn-sm" onClick={handleImportEvaluations}>
+                仮説として取り込む
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setImportedEvals(null)}>
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="tab-bar" style={{ marginBottom: 'var(--space-lg)' }}>
         <button className={`tab-item ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>全て ({hypotheses.length})</button>
@@ -118,6 +221,7 @@ export default function HypothesisPage() {
                   </div>
                   <span className="badge badge-accent">{h.category}</span>
                   <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>優先度 {h.priority}</span>
+                  {h.description?.includes('[主要因候補]') || h.description?.includes('[修飾因子候補]') || h.description?.includes('[結果所見]') ? <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--ote-eval-color, #7c5cbf)', background: 'rgba(124,92,191,0.08)', padding: '1px 6px', borderRadius: 4 }}>評価連携</span> : null}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
                   {h.source === 'ai' && <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-accent)' }}>AI提案</span>}
@@ -134,7 +238,7 @@ export default function HypothesisPage() {
                   <button className="btn btn-ghost btn-sm" onClick={() => setEditingId(null)}>取消</button>
                 </div>
               ) : (
-                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)', lineHeight: 1.7, marginBottom: 'var(--space-sm)' }}>{h.description}</div>
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-primary)', lineHeight: 1.7, marginBottom: 'var(--space-sm)', whiteSpace: 'pre-wrap' }}>{h.description}</div>
               )}
               {h.rationale && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginBottom: 4 }}>根拠: {h.rationale}</div>}
               {h.next_check && (

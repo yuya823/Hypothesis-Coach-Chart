@@ -8,7 +8,7 @@ import DashboardPage from './pages/DashboardPage';
 import ClientListPage from './pages/ClientListPage';
 import ClientDetailPage from './pages/ClientDetailPage';
 import IntakeFormPage from './pages/IntakeFormPage';
-import ObservationPage from './pages/ObservationPage';
+import ObservationTestEvalPage from './pages/ObservationTestEvalPage';
 import HypothesisPage from './pages/HypothesisPage';
 import InterventionPage from './pages/InterventionPage';
 import SessionHistoryPage from './pages/SessionHistoryPage';
@@ -16,6 +16,8 @@ import MediaComparisonPage from './pages/MediaComparisonPage';
 import StaffReviewPage from './pages/StaffReviewPage';
 import AuditLogPage from './pages/AuditLogPage';
 import SettingsPage from './pages/SettingsPage';
+import AIDraftReviewPage from './pages/AIDraftReviewPage';
+import KBManagePage from './pages/KBManagePage';
 
 // Auth Context
 export const AuthContext = createContext(null);
@@ -37,6 +39,14 @@ function ProtectedRoute({ children }) {
     );
   }
   if (!user) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function AdminRoute({ children }) {
+  const { user } = useAuth();
+  if (user?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
   return children;
 }
 
@@ -130,14 +140,16 @@ export default function App() {
                     <Route path="/clients" element={<ClientListPage />} />
                     <Route path="/clients/:id" element={<ClientDetailPage />} />
                     <Route path="/clients/:id/intake" element={<IntakeFormPage />} />
-                    <Route path="/sessions/:id/observation" element={<ObservationPage />} />
+                    <Route path="/sessions/:id/observation" element={<ObservationTestEvalPage />} />
                     <Route path="/sessions/:id/hypothesis" element={<HypothesisPage />} />
                     <Route path="/sessions/:id/intervention" element={<InterventionPage />} />
+                    <Route path="/sessions/:id/ai-draft" element={<AIDraftReviewPage />} />
                     <Route path="/clients/:id/history" element={<SessionHistoryPage />} />
                     <Route path="/clients/:id/media" element={<MediaComparisonPage />} />
                     <Route path="/review" element={<StaffReviewPage />} />
-                    <Route path="/audit" element={<AuditLogPage />} />
+                    <Route path="/audit" element={<AdminRoute><AuditLogPage /></AdminRoute>} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/kb" element={<AdminRoute><KBManagePage /></AdminRoute>} />
                   </Routes>
                 </Layout>
               </ProtectedRoute>

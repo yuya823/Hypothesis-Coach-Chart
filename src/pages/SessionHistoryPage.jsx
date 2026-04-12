@@ -10,6 +10,7 @@ export default function SessionHistoryPage() {
   const [selectedSession, setSelectedSession] = useState(null);
   const [hypotheses, setHypotheses] = useState([]);
   const [interventions, setInterventions] = useState([]);
+  const [editingDate, setEditingDate] = useState(null);
 
   useEffect(() => { loadData(); }, [clientId]);
 
@@ -29,6 +30,20 @@ export default function SessionHistoryPage() {
     ]);
     setHypotheses(h);
     setInterventions(iv);
+  };
+
+  const handleDateChange = async (sessionId, newDate, e) => {
+    if (e) e.stopPropagation();
+    try {
+      await db.updateSession(sessionId, { date: newDate });
+      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, date: newDate } : s));
+      if (selectedSession?.id === sessionId) {
+        setSelectedSession(prev => ({ ...prev, date: newDate }));
+      }
+      setEditingDate(null);
+    } catch (err) {
+      alert('日付の更新に失敗: ' + err.message);
+    }
   };
 
   if (loading) return <div style={{ padding: 'var(--space-2xl)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>読み込み中...</div>;
@@ -52,7 +67,26 @@ export default function SessionHistoryPage() {
                     <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--color-accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-accent)' }}>{s.session_number}</span>
                     <span style={{ fontWeight: 500 }}>第{s.session_number}回</span>
                   </div>
-                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: 4, marginLeft: 36 }}>{s.date}</div>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: 4, marginLeft: 36 }}>
+                    {editingDate === s.id ? (
+                      <input
+                        type="date"
+                        className="form-input"
+                        defaultValue={s.date}
+                        autoFocus
+                        onClick={e => e.stopPropagation()}
+                        style={{ width: 130, fontSize: 11, padding: '2px 4px' }}
+                        onBlur={e => handleDateChange(s.id, e.target.value, e)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleDateChange(s.id, e.target.value, e); if (e.key === 'Escape') { e.stopPropagation(); setEditingDate(null); } }}
+                      />
+                    ) : (
+                      <span
+                        onClick={e => { e.stopPropagation(); setEditingDate(s.id); }}
+                        style={{ cursor: 'pointer', borderBottom: '1px dashed var(--color-border)' }}
+                        title="クリックで日付を編集"
+                      >{s.date}</span>
+                    )}
+                  </div>
                 </div>
                 <span className={`badge ${s.status === 'completed' ? 'badge-success' : 'badge-warning'}`}>{s.status === 'completed' ? '完了' : '進行中'}</span>
               </div>
@@ -66,7 +100,17 @@ export default function SessionHistoryPage() {
           <div className="fade-in">
             <div className="card">
               <div className="card-header">
-                <h3 className="card-title">第{selectedSession.session_number}回セッション ({selectedSession.date})</h3>
+                <h3 className="card-title">第{selectedSession.session_number}回セッション (
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={selectedSession.date || ''}
+                    onChange={e => handleDateChange(selectedSession.id, e.target.value)}
+                    style={{ width: 130, fontSize: 'var(--font-size-xs)', padding: '2px 6px', display: 'inline', border: '1px solid transparent', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'inherit', cursor: 'pointer' }}
+                    onFocus={e => e.target.style.border = '1px solid var(--color-accent)'}
+                    onBlur={e => e.target.style.border = '1px solid transparent'}
+                  />)
+                </h3>
                 <Link to={`/sessions/${selectedSession.id}/observation`} className="btn btn-ghost btn-sm">開く →</Link>
               </div>
 
