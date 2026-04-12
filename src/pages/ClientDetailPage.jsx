@@ -80,27 +80,22 @@ export default function ClientDetailPage() {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <Link to="/clients" className="btn btn-ghost btn-sm" style={{ marginBottom: 'var(--space-sm)' }}>← 戻る</Link>
-          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
             {client.name}
             {flags.map((f, i) => <span key={i} className={`badge ${f.type === 'referral' ? 'badge-danger' : 'badge-warning'}`}>{f.label}</span>)}
           </h1>
-          <p className="page-subtitle">{client.age}歳 {client.gender} ・ セッション {client.session_count || 0}回 ・ 登録日 {client.created_at?.split('T')[0]}</p>
+          <p className="page-subtitle">{client.age}歳 {client.gender} ・ {client.session_count || 0}回 ・ {client.created_at?.split('T')[0]}</p>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)', alignItems: 'flex-end' }}>
-          <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-            <Link to={`/clients/${id}/intake`} className="btn btn-secondary">問診を見る</Link>
-            <Link to={`/clients/${id}/history`} className="btn btn-secondary">履歴</Link>
-          </div>
-          <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
-            <input
-              type="date"
-              className="form-input"
-              value={newSessionDate}
-              onChange={e => setNewSessionDate(e.target.value)}
-              style={{ width: 150, fontSize: 'var(--font-size-sm)', padding: '6px 10px' }}
-            />
-            <button className="btn btn-primary" onClick={handleCreateSession}>＋ 新規セッション</button>
-          </div>
+        <div>
+          <Link to={`/clients/${id}/intake`} className="btn btn-secondary">問診</Link>
+          <Link to={`/clients/${id}/history`} className="btn btn-secondary">履歴</Link>
+          <input
+            type="date"
+            className="form-input"
+            value={newSessionDate}
+            onChange={e => setNewSessionDate(e.target.value)}
+          />
+          <button className="btn btn-primary" onClick={handleCreateSession}>＋ 新規セッション</button>
         </div>
       </div>
 

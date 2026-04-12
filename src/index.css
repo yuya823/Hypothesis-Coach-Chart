@@ -3294,6 +3294,12 @@ input[type="checkbox"] {
     --font-size-lg: 1rem;
   }
 
+  /* Prevent horizontal overflow on body */
+  html, body, #root, .app-layout, .app-main {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
   /* Show hamburger */
   .mobile-menu-btn { display: flex; }
 
@@ -3319,43 +3325,59 @@ input[type="checkbox"] {
     padding: 0 var(--space-md);
   }
   .app-header .ai-disclaimer {
-    display: none; /* Hide on mobile to save space */
+    display: none;
   }
 
   /* Content */
   .app-content {
     padding: var(--space-md);
     padding-bottom: var(--space-xl);
+    max-width: 100%;
   }
 
   /* Grid — single column */
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+  }
+
+  /* Stat cards — compact */
+  .stat-card { padding: var(--space-md); }
+  .stat-value { font-size: var(--font-size-lg); }
+  .stat-label { font-size: 10px; }
 
   /* Page title */
-  .page-title { font-size: var(--font-size-xl); }
+  .page-title {
+    font-size: var(--font-size-xl);
+    flex-wrap: wrap;
+  }
   .page-subtitle { font-size: var(--font-size-xs); }
 
-  /* Page headers */
+  /* Page headers — FORCE vertical stack */
   .page-header {
     flex-direction: column !important;
-    gap: var(--space-sm);
+    gap: var(--space-sm) !important;
     align-items: stretch !important;
   }
   .page-header > div {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: var(--space-xs) !important;
+    flex-direction: row !important;
+    align-items: center !important;
   }
 
-  /* Buttons — full width on mobile for primary actions */
+  /* Buttons — compact on mobile */
   .page-header .btn-primary,
-  .page-header .btn-secondary {
+  .page-header .btn-secondary,
+  .page-header .btn-ghost {
     flex: 1;
     min-width: 0;
     justify-content: center;
     font-size: var(--font-size-xs);
     padding: 8px 12px;
+    white-space: nowrap;
   }
 
   /* Cards */
@@ -3373,12 +3395,31 @@ input[type="checkbox"] {
     margin: 0 calc(-1 * var(--space-md));
     padding: 0 var(--space-md);
   }
-  table { min-width: 500px; }
-  th, td { padding: 8px 10px; font-size: var(--font-size-xs); }
+  table { min-width: 420px; }
+  th, td { padding: 6px 8px; font-size: var(--font-size-xs); white-space: nowrap; }
 
   /* Forms */
   .form-input, .form-textarea, .form-select {
     font-size: 16px; /* Prevent iOS zoom */
+    max-width: 100%;
+  }
+
+  /* Client list cards — stack vertically */
+  .client-card-inner {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: var(--space-sm) !important;
+  }
+  .client-card-right {
+    text-align: left !important;
+  }
+
+  /* Client detail — date input */
+  .form-input[type="date"] {
+    width: 130px !important;
+    min-width: 0;
+    font-size: 13px !important;
+    padding: 6px 8px !important;
   }
 
   /* OTE columns — handled by mobile tabs */
@@ -3386,6 +3427,7 @@ input[type="checkbox"] {
     flex-direction: column;
     gap: var(--space-sm);
   }
+  .ote-header-left { width: 100%; }
   .ote-header-actions {
     display: flex;
     flex-wrap: wrap;
@@ -3401,7 +3443,7 @@ input[type="checkbox"] {
 
   /* OTE stats bar */
   .ote-stats { flex-wrap: wrap; gap: var(--space-xs); }
-  .ote-stat { flex: 1; min-width: 80px; padding: 6px 8px; font-size: 10px; justify-content: center; }
+  .ote-stat { flex: 1; min-width: 70px; padding: 6px 6px; font-size: 10px; justify-content: center; }
 
   /* KB suggestion panel */
   .kb-panel { margin-top: var(--space-sm); }
@@ -3468,6 +3510,12 @@ input[type="checkbox"] {
 
   /* Sidebar user area */
   .sidebar-user { padding: var(--space-md); }
+
+  /* Search bar */
+  .search-bar { min-width: 0 !important; }
+
+  /* Filter selects */
+  .form-select { min-width: 100px !important; font-size: 13px; }
 }
 
 /* ─── Small phones (≤480px) ─── */

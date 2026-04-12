@@ -123,7 +123,7 @@ export default function ClientListPage() {
             const flags = typeof client.flags === 'string' ? JSON.parse(client.flags) : (client.flags || []);
             return (
               <Link key={client.id} to={`/clients/${client.id}`} className="card" style={{ textDecoration: 'none', color: 'inherit', padding: '14px var(--space-lg)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="client-card-inner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
                     <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--color-accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--font-size-base)', fontWeight: 600, color: 'var(--color-accent)' }}>
                       {client.name.charAt(0)}
@@ -138,7 +138,7 @@ export default function ClientListPage() {
                       </div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
+                  <div className="client-card-right" style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>主訴: {client.latest_chief_complaint || '未入力'}</div>
                     <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: 2 }}>次回: {client.next_session_date || '未定'}</div>
                   </div>
