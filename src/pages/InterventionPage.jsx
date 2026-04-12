@@ -160,7 +160,10 @@ export default function InterventionPage() {
     <div className="intervention-page">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <Link to={`/sessions/${sessionId}/hypothesis`} className="btn btn-ghost btn-sm" style={{ marginBottom: 'var(--space-sm)' }}>← 仮説に戻る</Link>
+          <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center', marginBottom: 'var(--space-sm)' }}>
+            <Link to={`/sessions/${sessionId}/hypothesis`} className="btn btn-ghost btn-sm">← 仮説に戻る</Link>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowExport(true)}>📤 エクスポート</button>
+          </div>
           <h1 className="page-title">介入・再評価</h1>
           <p className="page-subtitle">{client?.name} ・ 第{session?.session_number}回セッション</p>
         </div>
@@ -171,7 +174,6 @@ export default function InterventionPage() {
           <button className="btn btn-secondary" onClick={handleAIGenerate} disabled={aiLoading || adoptedHyps.length === 0}>
             {aiLoading ? 'AI生成中...' : 'AI介入候補を追加'}
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowExport(true)}>📤 エクスポート</button>
           <button className="btn btn-primary" onClick={handleCompleteSession} disabled={saving || session?.status === 'completed'}>
             {session?.status === 'completed' ? '完了済み' : saving ? '保存中...' : 'セッションを完了'}
           </button>
