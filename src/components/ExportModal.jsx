@@ -29,6 +29,7 @@ export default function ExportModal({ sessionId, clientName, sessionNumber, onCl
         const json = generateJSON(data, clientName);
         const filename = `session_${clientName}_${sessionNumber}_${new Date().toISOString().split('T')[0]}.json`;
         downloadJSON(json, filename);
+        onClose();
       } else {
         // PDF
         let clientSummary = null;
@@ -43,10 +44,11 @@ export default function ExportModal({ sessionId, clientName, sessionNumber, onCl
           }
         }
         openPrintPDF(data, exportType, clientSummary);
+        // Delay close for mobile fallback download to complete
+        setTimeout(() => onClose(), 300);
       }
-      onClose();
     } catch (err) {
-      setError(err.message);
+      setError('エクスポートに失敗しました: ' + err.message);
     } finally {
       setLoading(false);
     }

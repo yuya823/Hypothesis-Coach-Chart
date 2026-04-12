@@ -110,11 +110,31 @@ export function openPrintPDF(data, type = 'detail', clientSummary = null) {
     html = buildReviewHTML(data);
   }
 
+  // Try window.open first (works on desktop)
   const printWindow = window.open('', '_blank');
-  printWindow.document.write(html);
-  printWindow.document.close();
-  printWindow.focus();
-  setTimeout(() => printWindow.print(), 500);
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      try { printWindow.print(); } catch (e) { /* User can print manually */ }
+    }, 500);
+    return;
+  }
+
+  // Fallback for mobile: download as HTML file
+  // User can open the downloaded file and print/share from there
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const dateStr = new Date().toISOString().split('T')[0];
+  const typeLabel = type === 'detail' ? '詳細' : type === 'client' ? '共有' : 'レビュー';
+  a.download = `${client.name}_第${session.session_number}回_${typeLabel}_${dateStr}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function buildDetailHTML(data) {
