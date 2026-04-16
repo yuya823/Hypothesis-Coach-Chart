@@ -321,3 +321,61 @@ function buildReviewHTML(data) {
 <div class="comment-area">（レビューコメントを記入）</div>
 </body></html>`;
 }
+
+// ─── Email Body (plain text for mailto:) ───
+
+export function generateEmailBody(data, clientSummary = null) {
+  const { session, client } = data;
+  const s = clientSummary || {};
+
+  const subject = `セッションまとめ — ${client.name}さま 第${session.session_number}回 (${session.date})`;
+
+  let body = '';
+  body += `${client.name}さま\n\n`;
+  body += `いつもお疲れさまです。\n`;
+  body += `第${session.session_number}回 (${session.date}) のセッションまとめをお送りします。\n\n`;
+  body += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  body += `■ 今日確認したこと\n`;
+  body += `${s.today_checked || 'セッション内容を確認しました。'}\n\n`;
+
+  body += `■ 今日見つかったポイント\n`;
+  body += `${s.today_findings || '—'}\n\n`;
+
+  body += `■ 今日行ったこと\n`;
+  body += `${s.today_intervention || '—'}\n\n`;
+
+  if (s.changes) {
+    body += `■ 変化したこと\n`;
+    body += `${s.changes}\n\n`;
+  }
+
+  if (s.homework && s.homework.length > 0) {
+    body += `■ お家でやっていただきたいこと\n`;
+    s.homework.forEach(h => {
+      body += `・${h.task}`;
+      if (h.frequency) body += ` (${h.frequency})`;
+      if (h.purpose) body += ` — ${h.purpose}`;
+      body += `\n`;
+    });
+    body += `\n`;
+  } else if (data.session.homework) {
+    body += `■ お家でやっていただきたいこと\n`;
+    body += `${data.session.homework}\n\n`;
+  }
+
+  body += `■ 次回確認すること\n`;
+  body += `${s.next_check || data.session.next_plan || '次回のセッションで確認します。'}\n\n`;
+
+  body += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  if (s.encouragement) {
+    body += `${s.encouragement}\n\n`;
+  }
+
+  body += `ご不明点がありましたらお気軽にご連絡ください。\n`;
+  body += `次回のセッションもよろしくお願いします。\n`;
+
+  return { subject, body };
+}
+

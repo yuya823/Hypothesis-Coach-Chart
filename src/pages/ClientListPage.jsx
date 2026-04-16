@@ -13,7 +13,7 @@ export default function ClientListPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newClient, setNewClient] = useState({ name: '', age: '', gender: '女性' });
+  const [newClient, setNewClient] = useState({ name: '', age: '', gender: '女性', email: '' });
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -31,6 +31,7 @@ export default function ClientListPage() {
         name: newClient.name,
         age: newClient.age ? parseInt(newClient.age) : null,
         gender: newClient.gender,
+        email: newClient.email.trim() || null,
         status: 'active',
         flags: [],
         session_count: 0,
@@ -38,7 +39,7 @@ export default function ClientListPage() {
       await db.createAuditLog({ user_id: user.id, user_name: user.name, action: 'client_create', target: created.id, target_label: created.name, details: 'クライアントを新規登録' });
       setClients(prev => [created, ...prev]);
       setShowCreateModal(false);
-      setNewClient({ name: '', age: '', gender: '女性' });
+      setNewClient({ name: '', age: '', gender: '女性', email: '' });
       navigate(`/clients/${created.id}`);
     } catch (err) {
       alert('作成に失敗しました: ' + err.message);
@@ -89,6 +90,11 @@ export default function ClientListPage() {
                   <option>女性</option><option>男性</option><option>その他</option>
                 </select>
               </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">メールアドレス</label>
+              <input className="form-input" type="email" value={newClient.email} onChange={e => setNewClient(p => ({ ...p, email: e.target.value }))} placeholder="example@email.com" />
+              <div className="form-hint">セッション記録の送信に使用します（任意）</div>
             </div>
             <div style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end' }}>
               <button className="btn btn-ghost" onClick={() => setShowCreateModal(false)}>キャンセル</button>

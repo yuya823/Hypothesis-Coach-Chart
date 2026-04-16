@@ -15,6 +15,15 @@ export default function ClientDetailPage() {
   const [editingDate, setEditingDate] = useState(null);
   const [newSessionDate, setNewSessionDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', age: '', gender: '', email: '', status: '' });
+  const [saving, setSaving] = useState(false);
+
+  // Delete confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     loadData();
   }, [id]);
@@ -69,6 +78,64 @@ export default function ClientDetailPage() {
     }
   };
 
+  // ── Edit handlers ──
+  const openEditModal = () => {
+    setEditForm({
+      name: client.name || '',
+      age: client.age?.toString() || '',
+      gender: client.gender || '',
+      email: client.email || '',
+      status: client.status || 'active',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm.name.trim()) { alert('名前は必須です'); return; }
+    setSaving(true);
+    try {
+      const updates = {
+        name: editForm.name.trim(),
+        age: editForm.age ? parseInt(editForm.age) : null,
+        gender: editForm.gender,
+        email: editForm.email.trim() || null,
+        status: editForm.status,
+      };
+      const updated = await db.updateClient(id, updates);
+      setClient(updated);
+      setShowEditModal(false);
+      await db.createAuditLog({
+        user_id: user.id, user_name: user.name,
+        action: 'client_update', target: id,
+        target_label: updates.name,
+        details: 'クライアント情報を編集',
+      });
+    } catch (err) {
+      alert('保存に失敗しました: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Delete handler ──
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await db.createAuditLog({
+        user_id: user.id, user_name: user.name,
+        action: 'client_delete', target: id,
+        target_label: client.name,
+        details: `クライアント「${client.name}」を削除`,
+      });
+      await db.deleteClient(id);
+      navigate('/clients');
+    } catch (err) {
+      alert('削除に失敗しました: ' + err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) return <div style={{ padding: 'var(--space-2xl)', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>読み込み中...</div>;
   if (!client) return <div className="empty-state"><p>クライアントが見つかりません</p></div>;
 
@@ -83,10 +150,16 @@ export default function ClientDetailPage() {
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
             {client.name}
             {flags.map((f, i) => <span key={i} className={`badge ${f.type === 'referral' ? 'badge-danger' : 'badge-warning'}`}>{f.label}</span>)}
+            {client.status === 'inactive' && <span className="badge" style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)' }}>非アクティブ</span>}
           </h1>
-          <p className="page-subtitle">{client.age}歳 {client.gender} ・ {client.session_count || 0}回 ・ {client.created_at?.split('T')[0]}</p>
+          <p className="page-subtitle">
+            {client.age}歳 {client.gender} ・ {client.session_count || 0}回 ・ {client.created_at?.split('T')[0]}
+            {client.email && <span style={{ marginLeft: 'var(--space-sm)' }}>・ ✉ {client.email}</span>}
+          </p>
         </div>
-        <div>
+        <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="btn btn-ghost btn-sm" onClick={openEditModal} title="クライアント情報を編集">✏️ 編集</button>
+          <button className="btn btn-danger btn-sm" onClick={() => setShowDeleteConfirm(true)} title="クライアントを削除">🗑 削除</button>
           <Link to={`/clients/${id}/intake`} className="btn btn-secondary">問診</Link>
           <Link to={`/clients/${id}/history`} className="btn btn-secondary">履歴</Link>
           <input
@@ -98,6 +171,111 @@ export default function ClientDetailPage() {
           <button className="btn btn-primary" onClick={handleCreateSession}>＋ 新規セッション</button>
         </div>
       </div>
+
+      {/* ── 編集モーダル ── */}
+      {showEditModal && (
+        <div className="client-modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="client-modal" onClick={e => e.stopPropagation()}>
+            <div className="client-modal-header">
+              <h2 className="client-modal-title">クライアント情報を編集</h2>
+              <button className="export-modal-close" onClick={() => setShowEditModal(false)}>✕</button>
+            </div>
+            <div className="client-modal-body">
+              <div className="form-group">
+                <label className="form-label">名前 *</label>
+                <input
+                  className="form-input"
+                  value={editForm.name}
+                  onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                  autoFocus
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
+                <div className="form-group">
+                  <label className="form-label">年齢</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    value={editForm.age}
+                    onChange={e => setEditForm(p => ({ ...p, age: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">性別</label>
+                  <select
+                    className="form-select"
+                    value={editForm.gender}
+                    onChange={e => setEditForm(p => ({ ...p, gender: e.target.value }))}
+                  >
+                    <option>女性</option>
+                    <option>男性</option>
+                    <option>その他</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">メールアドレス</label>
+                <input
+                  className="form-input"
+                  type="email"
+                  value={editForm.email}
+                  onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))}
+                  placeholder="example@email.com"
+                />
+                <div className="form-hint">セッション記録の送信に使用します</div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">ステータス</label>
+                <select
+                  className="form-select"
+                  value={editForm.status}
+                  onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}
+                >
+                  <option value="active">アクティブ</option>
+                  <option value="inactive">非アクティブ</option>
+                </select>
+              </div>
+            </div>
+            <div className="client-modal-footer">
+              <button className="btn btn-ghost" onClick={() => setShowEditModal(false)}>キャンセル</button>
+              <button className="btn btn-primary" onClick={handleSaveEdit} disabled={saving || !editForm.name.trim()}>
+                {saving ? '保存中...' : '保存する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 削除確認モーダル ── */}
+      {showDeleteConfirm && (
+        <div className="client-modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="client-modal client-modal--danger" onClick={e => e.stopPropagation()}>
+            <div className="client-modal-header">
+              <h2 className="client-modal-title" style={{ color: 'var(--color-danger)' }}>⚠ クライアントを削除</h2>
+            </div>
+            <div className="client-modal-body">
+              <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>
+                <strong>{client.name}</strong> の情報をすべて削除します。<br />
+                関連するセッション記録・問診データ・仮説・介入記録もすべて削除されます。
+              </p>
+              <div className="ai-disclaimer" style={{ marginTop: 'var(--space-md)', borderColor: 'rgba(192, 57, 43, 0.2)', background: 'rgba(192, 57, 43, 0.04)', color: 'var(--color-danger)' }}>
+                ⚠ この操作は取り消せません。本当に削除しますか？
+              </div>
+            </div>
+            <div className="client-modal-footer">
+              <button className="btn btn-ghost" onClick={() => setShowDeleteConfirm(false)}>キャンセル</button>
+              <button
+                className="btn btn-danger"
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{ background: 'var(--color-danger)', color: 'white', borderColor: 'var(--color-danger)' }}
+              >
+                {deleting ? '削除中...' : '削除する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {flags.length > 0 && (
         <div style={{ background: 'rgba(192,57,43,0.04)', border: '1px solid rgba(192,57,43,0.12)', borderRadius: 'var(--radius-md)', padding: 'var(--space-md) var(--space-lg)', marginBottom: 'var(--space-lg)' }}>

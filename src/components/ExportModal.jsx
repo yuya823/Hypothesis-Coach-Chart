@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { collectSessionData, generateJSON, downloadJSON, openPrintPDF } from '../services/exportService';
+import { useState, useEffect } from 'react';
+import { collectSessionData, generateJSON, downloadJSON, openPrintPDF, generateEmailBody } from '../services/exportService';
 import { promptF_ClientSummary } from '../services/aiService';
+import * as db from '../lib/database';
 
 const EXPORT_TYPES = [
   { value: 'detail', label: '詳細版', desc: '内部記録用 — 全項目を含む完全な記録', icon: '📋' },
@@ -13,11 +14,25 @@ const FORMAT_OPTIONS = [
   { value: 'json', label: 'JSON', desc: 'バックアップ・連携用' },
 ];
 
-export default function ExportModal({ sessionId, clientName, sessionNumber, onClose }) {
+export default function ExportModal({ sessionId, clientId, clientName, sessionNumber, onClose }) {
   const [exportType, setExportType] = useState('detail');
   const [format, setFormat] = useState('pdf');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [showEmailInput, setShowEmailInput] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
+
+  // クライアントのメールアドレスを取得
+  useEffect(() => {
+    if (clientId) {
+      db.getClientById(clientId).then(c => {
+        if (c?.email) setClientEmail(c.email);
+      }).catch(() => {});
+    }
+  }, [clientId]);
 
   const handleExport = async () => {
     setLoading(true);
@@ -51,6 +66,55 @@ export default function ExportModal({ sessionId, clientName, sessionNumber, onCl
       setError('エクスポートに失敗しました: ' + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // メールアドレスを保存
+  const handleSaveEmail = async (email) => {
+    if (!clientId) return;
+    try {
+      await db.updateClient(clientId, { email: email.trim() });
+      setClientEmail(email.trim());
+      setEditingEmail(false);
+    } catch (err) {
+      console.error('メールアドレス保存エラー:', err);
+    }
+  };
+
+  // メール送信（mailto:リンク方式）
+  const handleSendEmail = async () => {
+    if (!clientEmail.trim()) {
+      setShowEmailInput(true);
+      return;
+    }
+
+    setEmailLoading(true);
+    setError('');
+    try {
+      const data = await collectSessionData(sessionId);
+
+      let clientSummary = null;
+      // クライアント共有版の場合はAI要約を生成
+      try {
+        const json = generateJSON(data, clientName);
+        const result = await promptF_ClientSummary(json);
+        if (result.success) clientSummary = result.data;
+      } catch (aiErr) {
+        console.warn('AI要約を使用せずデフォルトテンプレートで送信:', aiErr);
+      }
+
+      const { subject, body } = generateEmailBody(data, clientSummary);
+      
+      // mailto:リンクでメールアプリを開く
+      const mailtoUrl = `mailto:${encodeURIComponent(clientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.location.href = mailtoUrl;
+      
+      setEmailSent(true);
+      setTimeout(() => setEmailSent(false), 3000);
+    } catch (err) {
+      setError('メール準備に失敗しました: ' + err.message);
+    } finally {
+      setEmailLoading(false);
     }
   };
 
@@ -103,6 +167,69 @@ export default function ExportModal({ sessionId, clientName, sessionNumber, onCl
               ⚠ クライアント共有版はAIで平易な文章に変換します。内容を必ず確認してください。
             </div>
           )}
+
+          {/* ── メール送信セクション ── */}
+          <div className="export-section email-send-section">
+            <div className="export-section-title">📧 クライアントにメール送信</div>
+            <div className="email-send-card">
+              {clientEmail && !editingEmail ? (
+                <div className="email-send-info">
+                  <div className="email-send-address">
+                    <span className="email-send-icon">✉</span>
+                    <span className="email-send-email">{clientEmail}</span>
+                    <button
+                      className="email-edit-btn"
+                      onClick={() => setEditingEmail(true)}
+                      title="メールアドレスを変更"
+                    >
+                      ✏️
+                    </button>
+                  </div>
+                  <button
+                    className="btn btn-email"
+                    onClick={handleSendEmail}
+                    disabled={emailLoading || emailSent}
+                  >
+                    {emailSent ? '✓ メールアプリを起動しました' : emailLoading ? '準備中...' : '📧 セッションまとめをメール送信'}
+                  </button>
+                  <div className="email-send-hint">
+                    クライアント共有版の内容をメール本文に含めて送信します
+                  </div>
+                </div>
+              ) : (
+                <div className="email-send-register">
+                  <div className="email-send-register-text">
+                    {editingEmail ? 'メールアドレスを変更' : 'クライアントのメールアドレスを登録するとワンクリックで送信できます'}
+                  </div>
+                  <div className="email-input-row">
+                    <input
+                      type="email"
+                      className="form-input email-input"
+                      placeholder="example@email.com"
+                      value={clientEmail}
+                      onChange={e => setClientEmail(e.target.value)}
+                      autoFocus={editingEmail || showEmailInput}
+                    />
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleSaveEmail(clientEmail)}
+                      disabled={!clientEmail.trim() || !clientEmail.includes('@')}
+                    >
+                      保存
+                    </button>
+                    {editingEmail && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => { setEditingEmail(false); }}
+                      >
+                        キャンセル
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
           {error && <div style={{ color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', marginTop: 'var(--space-sm)' }}>{error}</div>}
         </div>

@@ -42,6 +42,7 @@ create table if not exists public.clients (
   flags jsonb default '[]'::jsonb,
   latest_chief_complaint text,
   latest_goal text,
+  email text,
   session_count integer default 0,
   last_session_date date,
   next_session_date date,
