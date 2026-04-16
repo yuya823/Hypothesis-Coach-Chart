@@ -183,7 +183,6 @@ export default function InterventionPage() {
       {showExport && (
         <ExportModal
           sessionId={sessionId}
-          clientId={client?.id}
           clientName={client?.name}
           sessionNumber={session?.session_number}
           onClose={() => setShowExport(false)}
